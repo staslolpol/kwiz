@@ -57,9 +57,20 @@
   .btn.secondary { background: #eef2f7; color: #1e3c72; }
   .score { font-size: 26px; text-align: center; font-weight: 700; color: #1e3c72; margin: 20px 0; }
   .home-btn { margin: 0 auto; display: block; }
+  .total-score {
+    position: fixed; top: 14px; right: 14px; background: #1e3c72; color: #fff;
+    padding: 8px 16px; border-radius: 999px; font-size: 14px; font-weight: 700;
+    box-shadow: 0 2px 8px rgba(0,0,0,.2); z-index: 10;
+  }
+  .result-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 15px; }
+  .result-table th, .result-table td { padding: 8px 10px; border-bottom: 1px solid #e3e9f2; text-align: left; }
+  .result-table th { color: #888; font-weight: 600; font-size: 13px; }
+  .result-table td.num { text-align: right; font-weight: 700; color: #1e3c72; }
+  .result-table tr.total-row td { font-weight: 700; border-top: 2px solid #1e3c72; }
 </style>
 </head>
 <body>
+<div class="total-score" id="totalScoreBadge">🏅 Баллы: 0 / 25</div>
 <div class="container">
 
   <!-- Выбор категории -->
@@ -91,8 +102,12 @@
   <div id="result" class="hidden">
     <h1 id="resultTitle">Результат</h1>
     <div class="score" id="scoreText"></div>
+    <table class="result-table" id="resultsTable"></table>
     <p class="subtitle" id="scoreComment"></p>
     <button class="btn home-btn" onclick="goHome()">Играть ещё раз</button>
+    <p style="text-align:center; margin-top:14px;">
+      <button class="btn secondary" onclick="resetScores()">♻️ Сбросить баллы</button>
+    </p>
   </div>
 
 </div>
@@ -206,6 +221,30 @@ let currentIndex = 0;
 let score = 0;
 let answered = false;
 
+// --- Подсчёт баллов ---
+// За сессию (текущий проход категории) — переменная score выше.
+// Общие баллы по всем категориям хранятся в catScores и сохраняются в localStorage,
+// поэтому результат не теряется при перезагрузке страницы.
+const TOTAL_QUESTIONS = Object.values(QUIZ_DATA)
+  .reduce((sum, cat) => sum + cat.questions.length, 0); // 25
+
+let catScores = JSON.parse(localStorage.getItem('quizCatScores') || '{}');
+
+function saveCatScores() {
+  localStorage.setItem('quizCatScores', JSON.stringify(catScores));
+}
+
+function totalScore() {
+  return Object.values(catScores).reduce((sum, s) => sum + s, 0);
+}
+
+function updateTotalBadge() {
+  document.getElementById('totalScoreBadge').textContent =
+    `🏅 Баллы: ${totalScore()} / ${TOTAL_QUESTIONS}`;
+}
+
+updateTotalBadge();
+
 document.querySelectorAll('.cat-btn').forEach(btn => {
   btn.addEventListener('click', () => startQuiz(btn.dataset.cat));
 });
@@ -226,7 +265,7 @@ function showQuestion() {
   answered = false;
 
   document.getElementById('progress').textContent =
-    `${data.title} — вопрос ${currentIndex + 1} из ${data.questions.length} | Верных ответов: ${score}`;
+    `${data.title} — вопрос ${currentIndex + 1} из ${data.questions.length} | Баллы: ${score}`;
   document.getElementById('questionText').textContent = item.q;
   document.getElementById('feedback').textContent = '';
   document.getElementById('feedback').className = 'feedback';
@@ -254,7 +293,8 @@ function selectAnswer(i, btn) {
   const fb = document.getElementById('feedback');
   if (i === correct) {
     score++;
-    fb.textContent = '✅ Верно!';
+    saveScore(); // балл засчитывается сразу после верного ответа
+    fb.textContent = '✅ Верно! +1 балл';
     fb.classList.add('ok');
   } else {
     btn.classList.add('wrong');
@@ -262,8 +302,17 @@ function selectAnswer(i, btn) {
     fb.classList.add('bad');
   }
   document.getElementById('progress').textContent =
-    `${QUIZ_DATA[currentCat].title} — вопрос ${currentIndex + 1} из ${QUIZ_DATA[currentCat].questions.length} | Верных ответов: ${score}`;
+    `${QUIZ_DATA[currentCat].title} — вопрос ${currentIndex + 1} из ${QUIZ_DATA[currentCat].questions.length} | Баллы: ${score}`;
   document.getElementById('nextBtn').classList.remove('hidden');
+}
+
+// Сохраняем лучший результат по категории и обновляем общий счётчик баллов
+function saveScore() {
+  if (score > (catScores[currentCat] || 0)) {
+    catScores[currentCat] = score;
+    saveCatScores();
+  }
+  updateTotalBadge();
 }
 
 function nextQuestion() {
@@ -277,15 +326,40 @@ function nextQuestion() {
 
 function showResult() {
   const total = QUIZ_DATA[currentCat].questions.length;
+  saveScore();
   document.getElementById('quiz').classList.add('hidden');
   document.getElementById('result').classList.remove('hidden');
   document.getElementById('resultTitle').textContent = `Результат: ${QUIZ_DATA[currentCat].title}`;
-  document.getElementById('scoreText').textContent = `${score} / ${total}`;
+
+  // Баллы за текущий проход категории (1 балл = 1 верный ответ)
+  const percent = Math.round(score / total * 100);
+  document.getElementById('scoreText').textContent =
+    `${score} из ${total} баллов (${percent}%)`;
+
+  // Таблица результатов по всем категориям + общий счёт
+  let rows = '<tr><th>Категория</th><th style="text-align:right">Баллы</th></tr>';
+  for (const [key, cat] of Object.entries(QUIZ_DATA)) {
+    const s = catScores[key];
+    const catTotal = cat.questions.length;
+    rows += `<tr><td>${cat.title}</td><td class="num">${s !== undefined ? s + ' / ' + catTotal : '—'}</td></tr>`;
+  }
+  rows += `<tr class="total-row"><td>🏅 Всего баллов</td><td class="num">${totalScore()} / ${TOTAL_QUESTIONS}</td></tr>`;
+  document.getElementById('resultsTable').innerHTML = rows;
+
   let comment = '';
   if (score === total) comment = '🏆 Отлично! Ты настоящий IT-гуру!';
   else if (score >= total * 0.6) comment = '👍 Хороший результат! Ещё немного практики — и будет идеал.';
   else comment = '📚 Стоит подучить матчасть. Попробуй ещё раз!';
   document.getElementById('scoreComment').textContent = comment;
+}
+
+function resetScores() {
+  if (confirm('Сбросить все накопленные баллы?')) {
+    catScores = {};
+    saveCatScores();
+    updateTotalBadge();
+    showResult(); // перерисовать таблицу
+  }
 }
 
 function goHome() {
