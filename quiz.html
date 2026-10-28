@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IT-квиз: проверь свои знания!</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: linear-gradient(135deg, #1e3c72, #2a5298);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    color: #333;
+  }
+  .container {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    max-width: 720px;
+    width: 100%;
+    padding: 32px;
+  }
+  h1 { text-align: center; margin-bottom: 8px; color: #1e3c72; }
+  .subtitle { text-align: center; color: #777; margin-bottom: 24px; }
+  .categories { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 24px; }
+  .cat-btn {
+    padding: 12px 20px; border: none; border-radius: 10px; cursor: pointer;
+    background: #eef2f7; font-size: 15px; font-weight: 600; color: #1e3c72;
+    transition: .2s;
+  }
+  .cat-btn:hover { background: #d6e0ee; transform: translateY(-2px); }
+  .hidden { display: none !important; }
+  .progress { font-size: 14px; color: #888; margin-bottom: 10px; }
+  .question { font-size: 20px; font-weight: 700; margin-bottom: 18px; color: #222; }
+  .answer {
+    display: block; width: 100%; text-align: left; margin-bottom: 10px;
+    padding: 14px 16px; border: 2px solid #dde4ec; border-radius: 10px;
+    background: #fafbfd; cursor: pointer; font-size: 16px; transition: .15s;
+  }
+  .answer:hover:not(:disabled) { border-color: #2a5298; background: #eef4ff; }
+  .answer.correct { background: #d8f5d8; border-color: #2e9e2e; }
+  .answer.wrong { background: #fde2e2; border-color: #d33; }
+  .answer:disabled { cursor: default; opacity: .9; }
+  .feedback { min-height: 24px; margin: 10px 0; font-weight: 600; }
+  .feedback.ok { color: #2e9e2e; }
+  .feedback.bad { color: #d33; }
+  .nav { display: flex; justify-content: space-between; margin-top: 16px; }
+  .btn {
+    padding: 12px 24px; border: none; border-radius: 10px; cursor: pointer;
+    font-size: 16px; font-weight: 600; background: #2a5298; color: #fff; transition: .2s;
+  }
+  .btn:hover { background: #1e3c72; }
+  .btn.secondary { background: #eef2f7; color: #1e3c72; }
+  .score { font-size: 26px; text-align: center; font-weight: 700; color: #1e3c72; margin: 20px 0; }
+  .home-btn { margin: 0 auto; display: block; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Выбор категории -->
+  <div id="menu">
+    <h1>💻 IT-квиз</h1>
+    <p class="subtitle">Выбери категорию — в каждой по 5 вопросов</p>
+    <div class="categories">
+      <button class="cat-btn" data-cat="programming">👨‍💻 Программирование</button>
+      <button class="cat-btn" data-cat="networks">🌐 Сети и Интернет</button>
+      <button class="cat-btn" data-cat="hardware">🖥️ Железо</button>
+      <button class="cat-btn" data-cat="security">🔒 Кибербезопасность</button>
+      <button class="cat-btn" data-cat="history">📜 История IT</button>
+    </div>
+  </div>
+
+  <!-- Экран вопроса -->
+  <div id="quiz" class="hidden">
+    <div class="progress" id="progress"></div>
+    <div class="question" id="questionText"></div>
+    <div id="answers"></div>
+    <div class="feedback" id="feedback"></div>
+    <div class="nav">
+      <button class="btn secondary" id="backBtn" onclick="goHome()">⬅ В меню</button>
+      <button class="btn hidden" id="nextBtn" onclick="nextQuestion()">Далее ➡</button>
+    </div>
+  </div>
+
+  <!-- Результаты -->
+  <div id="result" class="hidden">
+    <h1 id="resultTitle">Результат</h1>
+    <div class="score" id="scoreText"></div>
+    <p class="subtitle" id="scoreComment"></p>
+    <button class="btn home-btn" onclick="goHome()">Играть ещё раз</button>
+  </div>
+
+</div>
+
+<script>
+const QUIZ_DATA = {
+  programming: {
+    title: "👨‍💻 Программирование",
+    questions: [
+      { q: "Что означает аббревиатура OOP?",
+        a: ["Объектно-ориентированное программирование", "Открытая обработка пакетов", "Оптимизация операционных процессов", "Объектный порядок placement"],
+        c: 0 },
+      { q: "Какой язык программирования создал Брэндан Айх?",
+        a: ["Python", "JavaScript", "Java", "C++"],
+        c: 1 },
+      { q: "Что делает оператор «==» в большинстве языков?",
+        a: ["Присваивает значение переменной", "Сравнивает два значения", "Объявляет функцию", "Удаляет переменную"],
+        c: 1 },
+      { q: "Как называется ошибка, из-за которой программа бесконечно вызывает саму себя?",
+        a: ["Утечка памяти", "Дедлок", "Бесконечная рекурсия", "Гонка данных"],
+        c: 2 },
+      { q: "Что такое «компилятор»?",
+        a: ["Программа, переводящая код в машинный язык", "Инструмент для рисования интерфейсов", "База данных для хранения кода", "Социальная сеть программистов"],
+        c: 0 }
+    ]
+  },
+  networks: {
+    title: "🌐 Сети и Интернет",
+    questions: [
+      { q: "Что расшифровывается как HTTP?",
+        a: ["HyperText Transfer Protocol", "High Tech Transfer Program", "HyperText Transmission Process", "Host Transfer Text Protocol"],
+        c: 0 },
+      { q: "Какое устройство связывает локальную сеть с интернетом и распределяет IP-адреса?",
+        a: ["Монитор", "Роутер", "Принтер", "Сканер"],
+        c: 1 },
+      { q: "Сколько бит в одном IPv4-адресе?",
+        a: ["16", "32", "64", "128"],
+        c: 1 },
+      { q: "Какой протокол используется для отправки электронной почты?",
+        a: ["FTP", "SMTP", "SSH", "DNS"],
+        c: 1 },
+      { q: "Что делает служба DNS?",
+        a: ["Шифрует трафик", "Преобразует доменные имена в IP-адреса", "Хранит файлы на сервере", "Блокирует вирусы"],
+        c: 1 }
+    ]
+  },
+  hardware: {
+    title: "🖥️ Железо",
+    questions: [
+      { q: "Какой компонент компьютера называют «мозгом» системы?",
+        a: ["Оперативную память", "Жёсткий диск", "Процессор (CPU)", "Видеокарту"],
+        c: 2 },
+      { q: "Чем SSD отличается от HDD?",
+        a: ["SSD работает быстрее и не имеет движущихся частей", "SSD всегда объёмнее", "HDD тише и современнее", "Ничем не отличается"],
+        c: 0 },
+      { q: "Что означает аббревиатура RAM?",
+        a: ["Random Access Memory", "Read And Manage", "Rapid Application Model", "Reserved Area Module"],
+        c: 0 },
+      { q: "Сколько байт в одном мегабайте (по стандарту SI, 1 МБ = 10⁶ байт)?",
+        a: ["1 000", "1 024", "1 000 000", "1 073 741 824"],
+        c: 2 },
+      { q: "Какое устройство нужно для вывода изображения на экран во время игр?",
+        a: ["Звуковая карта", "GPU (видеокарта)", "Сетевая карта", "ТВ-тюнер"],
+        c: 1 }
+    ]
+  },
+  security: {
+    title: "🔒 Кибербезопасность",
+    questions: [
+      { q: "Что такое «фишинг»?",
+        a: ["Вид игры онлайн", "Мошенничество через поддельные письма и сайты", "Способ шифрования данных", "Тип резервного копирования"],
+        c: 1 },
+      { q: "Какой пароль считается самым надёжным?",
+        a: ["123456", "Имя пользователя", "Дата рождения", "Длинная случайная комбинация букв, цифр и символов"],
+        c: 3 },
+      { q: "Что делает двухфакторная аутентификация (2FA)?",
+        a: ["Ускоряет загрузку сайта", "Требует второй подтвердительный фактор помимо пароля", "Автоматически удаляет вирусы", "Заменяет антивирус"],
+        c: 1 },
+      { q: "Как называется вредоносное ПО, которое шифрует файлы и требует выкуп?",
+        a: ["Баннер", "Ransomware (вымогатель)", "Спам", "Кукис"],
+        c: 1 },
+      { q: "Для чего нужен VPN?",
+        a: ["Для создания таблиц в Excel", "Для защищённого туннелирования трафика в сети", "Для ускорения печати документов", "Для монтажа видео"],
+        c: 1 }
+    ]
+  },
+  history: {
+    title: "📜 История IT",
+    questions: [
+      { q: "Кого считают первым программистом в истории?",
+        a: ["Алан Тьюринг", "Ада Лавлейс", "Билл Гейтс", "Стив Джобс"],
+        c: 1 },
+      { q: "В каком году был создан первый сайт в World Wide Web?",
+        a: ["1969", "1991", "2001", "1985"],
+        c: 1 },
+      { q: "Как назывался первый электронный компьютер общего назначения?",
+        a: ["ENIAC", "Intel 4004", "Apple I", "IBM PC"],
+        c: 0 },
+      { q: "Кто основал компанию Apple вместе со Стивом Возняком?",
+        a: ["Марк Цукерберг", "Илон Маск", "Стив Джобс", "Ларри Пейдж"],
+        c: 2 },
+      { q: "Что произошло в 1969 году и считается предшественником интернета?",
+        a: ["Запуск первого смартфона", "Отправка первого сообщения по сети ARPANET", "Появление Windows", "Изобретение мыши для ПК"],
+        c: 1 }
+    ]
+  }
+};
+
+let currentCat = null;
+let currentIndex = 0;
+let score = 0;
+let answered = false;
+
+document.querySelectorAll('.cat-btn').forEach(btn => {
+  btn.addEventListener('click', () => startQuiz(btn.dataset.cat));
+});
+
+function startQuiz(cat) {
+  currentCat = cat;
+  currentIndex = 0;
+  score = 0;
+  document.getElementById('menu').classList.add('hidden');
+  document.getElementById('result').classList.add('hidden');
+  document.getElementById('quiz').classList.remove('hidden');
+  showQuestion();
+}
+
+function showQuestion() {
+  const data = QUIZ_DATA[currentCat];
+  const item = data.questions[currentIndex];
+  answered = false;
+
+  document.getElementById('progress').textContent =
+    `${data.title} — вопрос ${currentIndex + 1} из ${data.questions.length} | Верных ответов: ${score}`;
+  document.getElementById('questionText').textContent = item.q;
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('feedback').className = 'feedback';
+  document.getElementById('nextBtn').classList.add('hidden');
+
+  const answersDiv = document.getElementById('answers');
+  answersDiv.innerHTML = '';
+  item.a.forEach((text, i) => {
+    const b = document.createElement('button');
+    b.className = 'answer';
+    b.textContent = text;
+    b.onclick = () => selectAnswer(i, b);
+    answersDiv.appendChild(b);
+  });
+}
+
+function selectAnswer(i, btn) {
+  if (answered) return;
+  answered = true;
+  const correct = QUIZ_DATA[currentCat].questions[currentIndex].c;
+  const buttons = document.querySelectorAll('.answer');
+  buttons.forEach(b => b.disabled = true);
+  buttons[correct].classList.add('correct');
+
+  const fb = document.getElementById('feedback');
+  if (i === correct) {
+    score++;
+    fb.textContent = '✅ Верно!';
+    fb.classList.add('ok');
+  } else {
+    btn.classList.add('wrong');
+    fb.textContent = '❌ Неверно. Правильный ответ выделен зелёным.';
+    fb.classList.add('bad');
+  }
+  document.getElementById('progress').textContent =
+    `${QUIZ_DATA[currentCat].title} — вопрос ${currentIndex + 1} из ${QUIZ_DATA[currentCat].questions.length} | Верных ответов: ${score}`;
+  document.getElementById('nextBtn').classList.remove('hidden');
+}
+
+function nextQuestion() {
+  if (currentIndex + 1 < QUIZ_DATA[currentCat].questions.length) {
+    currentIndex++;
+    showQuestion();
+  } else {
+    showResult();
+  }
+}
+
+function showResult() {
+  const total = QUIZ_DATA[currentCat].questions.length;
+  document.getElementById('quiz').classList.add('hidden');
+  document.getElementById('result').classList.remove('hidden');
+  document.getElementById('resultTitle').textContent = `Результат: ${QUIZ_DATA[currentCat].title}`;
+  document.getElementById('scoreText').textContent = `${score} / ${total}`;
+  let comment = '';
+  if (score === total) comment = '🏆 Отлично! Ты настоящий IT-гуру!';
+  else if (score >= total * 0.6) comment = '👍 Хороший результат! Ещё немного практики — и будет идеал.';
+  else comment = '📚 Стоит подучить матчасть. Попробуй ещё раз!';
+  document.getElementById('scoreComment').textContent = comment;
+}
+
+function goHome() {
+  document.getElementById('quiz').classList.add('hidden');
+  document.getElementById('result').classList.add('hidden');
+  document.getElementById('menu').classList.remove('hidden');
+}
+</script>
+</body>
+</html>
